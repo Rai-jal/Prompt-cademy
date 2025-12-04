@@ -19,9 +19,17 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { supabase } from '@/lib/supabase';
-import { FileText, Plus, Copy, Trash2, Share2, Lock } from 'lucide-react';
+import { FileText, Plus, Copy, Trash2, Share2, Lock, Edit } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { AI_MODELS } from '@/lib/ai-models';
 
 type PromptTemplate = {
   id: string;
@@ -43,7 +51,7 @@ export default function TemplatesPage() {
   const [publicTemplates, setPublicTemplates] = useState<PromptTemplate[]>([]);
   const [loadingData, setLoadingData] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [newTemplate, setNewTemplate] = useState({
+  const createEmptyTemplate = () => ({
     title: '',
     content: '',
     description: '',
@@ -51,6 +59,8 @@ export default function TemplatesPage() {
     model_recommendation: 'gpt-4o',
     is_public: false,
   });
+  const [templateForm, setTemplateForm] = useState(createEmptyTemplate);
+  const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -89,34 +99,85 @@ export default function TemplatesPage() {
     }
   }, [user, loadTemplates]);
 
-  const handleCreateTemplate = async (e: React.FormEvent) => {
+  const handleDialogClose = () => {
+    setIsDialogOpen(false);
+    setEditingTemplateId(null);
+    setTemplateForm(createEmptyTemplate());
+  };
+
+  const handleDialogChange = (open: boolean) => {
+    if (!open) {
+      handleDialogClose();
+    } else {
+      setIsDialogOpen(true);
+    }
+  };
+
+  const openCreateDialog = () => {
+    setEditingTemplateId(null);
+    setTemplateForm(createEmptyTemplate());
+    setIsDialogOpen(true);
+  };
+
+  const openEditDialog = (template: PromptTemplate) => {
+    setEditingTemplateId(template.id);
+    setTemplateForm({
+      title: template.title,
+      content: template.content,
+      description: template.description || '',
+      tags: template.tags?.join(', ') || '',
+      model_recommendation: template.model_recommendation || 'gpt-4o',
+      is_public: template.is_public,
+    });
+    setIsDialogOpen(true);
+  };
+
+  const handleSaveTemplate = async (e: React.FormEvent) => {
     e.preventDefault();
 
     try {
-      const { error } = await supabase.from('prompt_templates').insert([
-        {
-          ...newTemplate,
-          tags: newTemplate.tags.split(',').map((t) => t.trim()).filter(Boolean),
-          creator_id: user!.id,
-        },
-      ]);
+      const payload = {
+        title: templateForm.title,
+        content: templateForm.content,
+        description: templateForm.description || null,
+        tags: templateForm.tags
+          .split(',')
+          .map((t) => t.trim())
+          .filter(Boolean),
+        model_recommendation: templateForm.model_recommendation,
+        is_public: templateForm.is_public,
+      };
 
-      if (error) throw error;
+      if (editingTemplateId) {
+        const { error } = await supabase
+          .from('prompt_templates')
+          .update(payload)
+          .eq('id', editingTemplateId)
+          .eq('creator_id', user!.id);
 
-      toast({
-        title: 'Template saved',
-        description: 'Your prompt template has been saved successfully.',
-      });
+        if (error) throw error;
 
-      setNewTemplate({
-        title: '',
-        content: '',
-        description: '',
-        tags: '',
-        model_recommendation: 'gpt-4o',
-        is_public: false,
-      });
-      setIsDialogOpen(false);
+        toast({
+          title: 'Template updated',
+          description: 'Your prompt template has been updated successfully.',
+        });
+      } else {
+        const { error } = await supabase.from('prompt_templates').insert([
+          {
+            ...payload,
+            creator_id: user!.id,
+          },
+        ]);
+
+        if (error) throw error;
+
+        toast({
+          title: 'Template saved',
+          description: 'Your prompt template has been saved successfully.',
+        });
+      }
+
+      handleDialogClose();
       loadTemplates();
     } catch (error: any) {
       toast({
@@ -168,7 +229,9 @@ export default function TemplatesPage() {
     );
   }
 
-  const TemplateCard = ({ template, canDelete }: { template: PromptTemplate; canDelete: boolean }) => (
+  const TemplateCard = ({ template, canDelete }: { template: PromptTemplate; canDelete: boolean }) => {
+    const modelLabel = AI_MODELS[template.model_recommendation]?.name ?? template.model_recommendation;
+    return (
     <Card>
       <CardHeader>
         <div className="flex items-start justify-between">
@@ -198,10 +261,10 @@ export default function TemplatesPage() {
               {tag}
             </Badge>
           ))}
-          <Badge variant="outline">{template.model_recommendation}</Badge>
+          <Badge variant="outline">{modelLabel}</Badge>
         </div>
 
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button
             variant="outline"
             size="sm"
@@ -212,20 +275,32 @@ export default function TemplatesPage() {
             Copy
           </Button>
           {canDelete && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-2 text-destructive hover:text-destructive"
-              onClick={() => handleDeleteTemplate(template.id)}
-            >
-              <Trash2 className="h-3 w-3" />
-              Delete
-            </Button>
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-2"
+                onClick={() => openEditDialog(template)}
+              >
+                <Edit className="h-3 w-3" />
+                Edit
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-2 text-destructive hover:text-destructive"
+                onClick={() => handleDeleteTemplate(template.id)}
+              >
+                <Trash2 className="h-3 w-3" />
+                Delete
+              </Button>
+            </>
           )}
         </div>
       </CardContent>
     </Card>
-  );
+    );
+  };
 
   return (
     <SidebarLayout>
@@ -240,27 +315,29 @@ export default function TemplatesPage() {
               Save and reuse your best prompts
             </p>
           </div>
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <Dialog open={isDialogOpen} onOpenChange={handleDialogChange}>
             <DialogTrigger asChild>
-              <Button size="lg" className="gap-2">
+              <Button size="lg" className="gap-2" onClick={openCreateDialog}>
                 <Plus className="h-4 w-4" />
                 New Template
               </Button>
             </DialogTrigger>
             <DialogContent className="max-w-2xl">
               <DialogHeader>
-                <DialogTitle>Create Prompt Template</DialogTitle>
+                <DialogTitle>
+                  {editingTemplateId ? 'Edit Prompt Template' : 'Create Prompt Template'}
+                </DialogTitle>
                 <DialogDescription>
                   Save a prompt for reuse across projects
                 </DialogDescription>
               </DialogHeader>
-              <form onSubmit={handleCreateTemplate} className="space-y-4">
+              <form onSubmit={handleSaveTemplate} className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="title">Title</Label>
                   <Input
                     id="title"
-                    value={newTemplate.title}
-                    onChange={(e) => setNewTemplate({ ...newTemplate, title: e.target.value })}
+                    value={templateForm.title}
+                    onChange={(e) => setTemplateForm({ ...templateForm, title: e.target.value })}
                     placeholder="e.g., Blog Post Outline"
                     required
                   />
@@ -270,8 +347,8 @@ export default function TemplatesPage() {
                   <Label htmlFor="content">Prompt</Label>
                   <Textarea
                     id="content"
-                    value={newTemplate.content}
-                    onChange={(e) => setNewTemplate({ ...newTemplate, content: e.target.value })}
+                    value={templateForm.content}
+                    onChange={(e) => setTemplateForm({ ...templateForm, content: e.target.value })}
                     placeholder="Your prompt template..."
                     rows={6}
                     required
@@ -282,8 +359,10 @@ export default function TemplatesPage() {
                   <Label htmlFor="description">Description (Optional)</Label>
                   <Textarea
                     id="description"
-                    value={newTemplate.description}
-                    onChange={(e) => setNewTemplate({ ...newTemplate, description: e.target.value })}
+                    value={templateForm.description}
+                    onChange={(e) =>
+                      setTemplateForm({ ...templateForm, description: e.target.value })
+                    }
                     placeholder="What does this prompt do?"
                     rows={2}
                   />
@@ -293,26 +372,51 @@ export default function TemplatesPage() {
                   <Label htmlFor="tags">Tags (comma-separated)</Label>
                   <Input
                     id="tags"
-                    value={newTemplate.tags}
-                    onChange={(e) => setNewTemplate({ ...newTemplate, tags: e.target.value })}
+                    value={templateForm.tags}
+                    onChange={(e) => setTemplateForm({ ...templateForm, tags: e.target.value })}
                     placeholder="e.g., writing, blog, marketing"
                   />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="model">Recommended Model</Label>
+                  <Select
+                    value={templateForm.model_recommendation}
+                    onValueChange={(value) =>
+                      setTemplateForm({ ...templateForm, model_recommendation: value })
+                    }
+                  >
+                    <SelectTrigger id="model">
+                      <SelectValue placeholder="Select a model" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(AI_MODELS).map(([key, model]) => (
+                        <SelectItem key={key} value={key}>
+                          {model.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div className="flex items-center space-x-2">
                   <input
                     type="checkbox"
                     id="is_public"
-                    checked={newTemplate.is_public}
-                    onChange={(e) => setNewTemplate({ ...newTemplate, is_public: e.target.checked })}
+                    checked={templateForm.is_public}
+                    onChange={(e) =>
+                      setTemplateForm({ ...templateForm, is_public: e.target.checked })
+                    }
                     className="h-4 w-4"
                   />
                   <Label htmlFor="is_public">Make this template public</Label>
                 </div>
 
                 <div className="flex gap-3">
-                  <Button type="submit">Save Template</Button>
-                  <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
+                  <Button type="submit">
+                    {editingTemplateId ? 'Update Template' : 'Save Template'}
+                  </Button>
+                  <Button type="button" variant="outline" onClick={handleDialogClose}>
                     Cancel
                   </Button>
                 </div>
@@ -336,7 +440,7 @@ export default function TemplatesPage() {
                   <p className="text-muted-foreground mb-4">
                     Create your first prompt template to get started
                   </p>
-                  <Button onClick={() => setIsDialogOpen(true)}>Create Template</Button>
+                  <Button onClick={openCreateDialog}>Create Template</Button>
                 </CardContent>
               </Card>
             ) : (

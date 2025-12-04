@@ -10,7 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { supabase } from '@/lib/supabase';
-import { runPrompt } from '@/lib/ai-providers';
+import { runPromptViaApi } from '@/lib/client/ai';
 import { ChevronLeft, Clock, Target, Send, CheckCircle2, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
@@ -97,7 +97,11 @@ export default function ChallengePage() {
     setIsSubmitting(true);
 
     try {
-      const result = await runPrompt(promptText, 'gpt-4o');
+      const result = await runPromptViaApi(promptText, 'gpt-4o');
+
+      if (result.error) {
+        throw new Error(result.error);
+      }
 
       const score = calculateScore(result.response, challenge);
 

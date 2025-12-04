@@ -15,7 +15,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Switch } from '@/components/ui/switch';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Progress } from '@/components/ui/progress';
-import { AI_MODELS, compareModels, PromptResult } from '@/lib/ai-providers';
+import { AI_MODELS } from '@/lib/ai-models';
 import { supabase } from '@/lib/supabase';
 import {
   Zap,
@@ -31,6 +31,8 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { compareModelsViaApi } from '@/lib/client/ai';
+import type { PromptResult } from '@/types/ai';
 
 const AVAILABLE_MODELS = [
   'gpt-4o',
@@ -260,10 +262,14 @@ export default function PlaygroundPage() {
     setResults([]);
 
     try {
-      const modelResults = await compareModels(prompt, selectedModels, {
-        temperature,
-        max_tokens: maxTokens,
-      });
+      const modelResults = await compareModelsViaApi(
+        prompt,
+        selectedModels,
+        {
+          temperature,
+          max_tokens: maxTokens,
+        }
+      );
 
       setResults(modelResults);
 
