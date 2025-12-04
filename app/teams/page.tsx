@@ -21,7 +21,7 @@ import {
 } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { supabase } from '@/lib/supabase';
-import { Users, Plus, Settings, Crown, Shield, User, Activity } from 'lucide-react';
+import { Users, Plus, Crown, Shield, User, Activity } from 'lucide-react';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
 
@@ -301,13 +301,6 @@ export default function TeamsPage() {
                         Open
                       </Button>
                     </Link>
-                    {(team.role === 'owner' || team.role === 'admin') && (
-                      <Link href={`/teams/${team.id}/settings`}>
-                        <Button variant="outline" size="icon">
-                          <Settings className="h-4 w-4" />
-                        </Button>
-                      </Link>
-                    )}
                   </div>
                 </CardContent>
               </Card>

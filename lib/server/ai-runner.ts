@@ -1,111 +1,36 @@
-export type AIProvider = 'openai' | 'anthropic' | 'google';
+'use server';
 
-export type AIModel = {
-  id: string;
-  name: string;
-  provider: AIProvider;
-  contextWindow: number;
-  costPer1kInput: number;
-  costPer1kOutput: number;
-  supportsImages: boolean;
-};
+import 'server-only';
+
+import { AI_MODELS, type AIProvider } from '@/lib/ai-models';
+import type { ModelConfig, PromptResult } from '@/types/ai';
+
+type ProviderKeyMap = Partial<Record<AIProvider, string | undefined>>;
 
 const MAX_CONCURRENT_REQUESTS = 2;
 const RATE_LIMIT_DELAY_MS = 350;
 
-export const AI_MODELS: Record<string, AIModel> = {
-  'gpt-4o': {
-    id: 'gpt-4o',
-    name: 'GPT-4o',
-    provider: 'openai',
-    contextWindow: 128000,
-    costPer1kInput: 2.5,
-    costPer1kOutput: 10,
-    supportsImages: true,
-  },
-  'gpt-4o-mini': {
-    id: 'gpt-4o-mini',
-    name: 'GPT-4o Mini',
-    provider: 'openai',
-    contextWindow: 128000,
-    costPer1kInput: 0.15,
-    costPer1kOutput: 0.6,
-    supportsImages: true,
-  },
-  'gpt-4-turbo': {
-    id: 'gpt-4-turbo',
-    name: 'GPT-4 Turbo',
-    provider: 'openai',
-    contextWindow: 128000,
-    costPer1kInput: 10,
-    costPer1kOutput: 30,
-    supportsImages: true,
-  },
-  'claude-3-5-sonnet': {
-    id: 'claude-3-5-sonnet-20241022',
-    name: 'Claude 3.5 Sonnet',
-    provider: 'anthropic',
-    contextWindow: 200000,
-    costPer1kInput: 3,
-    costPer1kOutput: 15,
-    supportsImages: true,
-  },
-  'claude-3-5-haiku': {
-    id: 'claude-3-5-haiku-20241022',
-    name: 'Claude 3.5 Haiku',
-    provider: 'anthropic',
-    contextWindow: 200000,
-    costPer1kInput: 0.8,
-    costPer1kOutput: 4,
-    supportsImages: false,
-  },
-  'gemini-pro': {
-    id: 'gemini-1.5-pro',
-    name: 'Gemini 1.5 Pro',
-    provider: 'google',
-    contextWindow: 2000000,
-    costPer1kInput: 1.25,
-    costPer1kOutput: 5,
-    supportsImages: true,
-  },
-  'gemini-flash': {
-    id: 'gemini-1.5-flash',
-    name: 'Gemini 1.5 Flash',
-    provider: 'google',
-    contextWindow: 1000000,
-    costPer1kInput: 0.075,
-    costPer1kOutput: 0.3,
-    supportsImages: true,
-  },
-};
-
-export type ModelConfig = {
-  temperature?: number;
-  max_tokens?: number;
-  top_p?: number;
-  frequency_penalty?: number;
-  presence_penalty?: number;
-};
-
-export type PromptResult = {
-  response: string;
-  tokens_used: number;
-  input_tokens: number;
-  output_tokens: number;
-  duration_ms: number;
-  cost_estimate: number;
-  model: string;
-  provider: AIProvider;
-};
-
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const FALLBACK_PROVIDER_KEYS: ProviderKeyMap = {
+  openai: process.env.OPENAI_API_KEY || process.env.NEXT_PUBLIC_OPENAI_API_KEY,
+  anthropic: process.env.ANTHROPIC_API_KEY || process.env.NEXT_PUBLIC_ANTHROPIC_API_KEY,
+  google: process.env.GOOGLE_API_KEY || process.env.NEXT_PUBLIC_GOOGLE_API_KEY,
+};
+
+const resolveProviderKey = (
+  provider: AIProvider,
+  providerKeys: ProviderKeyMap
+): string | null => {
+  return providerKeys[provider] || FALLBACK_PROVIDER_KEYS[provider] || null;
+};
 
 async function buildProviderError(response: Response, providerLabel: string) {
   let errorBody: any = {};
   try {
     errorBody = await response.json();
-  } catch (_) {
-    // ignore body parsing errors
+  } catch {
+    // swallow parse error
   }
 
   if (response.status === 429) {
@@ -125,7 +50,8 @@ async function buildProviderError(response: Response, providerLabel: string) {
 async function runOpenAI(
   prompt: string,
   modelId: string,
-  config: ModelConfig
+  config: ModelConfig,
+  apiKey: string
 ): Promise<PromptResult> {
   const startTime = Date.now();
 
@@ -133,7 +59,7 @@ async function runOpenAI(
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${process.env.NEXT_PUBLIC_OPENAI_API_KEY}`,
+      Authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify({
       model: modelId,
@@ -177,7 +103,8 @@ async function runOpenAI(
 async function runAnthropic(
   prompt: string,
   modelId: string,
-  config: ModelConfig
+  config: ModelConfig,
+  apiKey: string
 ): Promise<PromptResult> {
   const startTime = Date.now();
 
@@ -185,7 +112,7 @@ async function runAnthropic(
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'x-api-key': process.env.NEXT_PUBLIC_ANTHROPIC_API_KEY || '',
+      'x-api-key': apiKey,
       'anthropic-version': '2023-06-01',
     },
     body: JSON.stringify({
@@ -228,12 +155,13 @@ async function runAnthropic(
 async function runGoogle(
   prompt: string,
   modelId: string,
-  config: ModelConfig
+  config: ModelConfig,
+  apiKey: string
 ): Promise<PromptResult> {
   const startTime = Date.now();
 
   const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${process.env.NEXT_PUBLIC_GOOGLE_API_KEY}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`,
     {
       method: 'POST',
       headers: {
@@ -283,39 +211,53 @@ async function runGoogle(
   };
 }
 
-export async function runPrompt(
+async function runModel(
   prompt: string,
   modelKey: string,
-  config: ModelConfig = {}
+  config: ModelConfig,
+  providerKeys: ProviderKeyMap
 ): Promise<PromptResult> {
   const modelInfo = AI_MODELS[modelKey];
   if (!modelInfo) {
     throw new Error(`Unknown model: ${modelKey}`);
   }
 
+  const providerKey = resolveProviderKey(modelInfo.provider, providerKeys);
+  if (!providerKey) {
+    throw new Error(
+      `Missing API key for ${modelInfo.provider}. Add a personal key in Settings or configure a server-side fallback.`
+    );
+  }
+
   switch (modelInfo.provider) {
     case 'openai':
-      return runOpenAI(prompt, modelInfo.id, config);
+      return runOpenAI(prompt, modelInfo.id, config, providerKey);
     case 'anthropic':
-      return runAnthropic(prompt, modelInfo.id, config);
+      return runAnthropic(prompt, modelInfo.id, config, providerKey);
     case 'google':
-      return runGoogle(prompt, modelInfo.id, config);
+      return runGoogle(prompt, modelInfo.id, config, providerKey);
     default:
       throw new Error(`Unsupported provider: ${modelInfo.provider}`);
   }
 }
 
-export async function compareModels(
-  prompt: string,
-  modelKeys: string[],
-  config: ModelConfig = {}
-): Promise<PromptResult[]> {
+export async function executeModelRuns({
+  prompt,
+  modelKeys,
+  config = {},
+  providerKeys = {},
+}: {
+  prompt: string;
+  modelKeys: string[];
+  config?: ModelConfig;
+  providerKeys?: ProviderKeyMap;
+}): Promise<PromptResult[]> {
   const aggregatedResults: PromptResult[] = [];
 
   for (let i = 0; i < modelKeys.length; i += MAX_CONCURRENT_REQUESTS) {
     const batch = modelKeys.slice(i, i + MAX_CONCURRENT_REQUESTS);
     const batchResults = await Promise.allSettled(
-      batch.map((modelKey) => runPrompt(prompt, modelKey, config))
+      batch.map((modelKey) => runModel(prompt, modelKey, config, providerKeys))
     );
 
     batchResults.forEach((result, idx) => {
@@ -325,15 +267,17 @@ export async function compareModels(
       if (result.status === 'fulfilled') {
         aggregatedResults.push(result.value);
       } else {
+        const errorMessage = result.reason?.message || 'Unknown error';
         aggregatedResults.push({
-          response: `Error: ${result.reason?.message || 'Unknown error'}`,
+          response: `Error: ${errorMessage}`,
           tokens_used: 0,
           input_tokens: 0,
           output_tokens: 0,
           duration_ms: 0,
           cost_estimate: 0,
-          model: modelInfo.id,
-          provider: modelInfo.provider,
+          model: modelInfo?.id || modelKey,
+          provider: modelInfo?.provider || 'openai',
+          error: errorMessage,
         });
       }
     });
@@ -345,3 +289,4 @@ export async function compareModels(
 
   return aggregatedResults;
 }
+

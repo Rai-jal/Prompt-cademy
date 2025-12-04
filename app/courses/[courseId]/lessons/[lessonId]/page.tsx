@@ -10,7 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { supabase, Lesson, UserProgress } from '@/lib/supabase';
-import { runPrompt } from '@/lib/ai-providers';
+import { runPromptViaApi } from '@/lib/client/ai';
 import { scorePrompt, ScoreBreakdown } from '@/lib/scoring-service';
 import {
   Lightbulb,
@@ -113,7 +113,11 @@ export default function LessonPage() {
     setScore(null);
 
     try {
-      const result = await runPrompt(prompt, 'gpt-4o');
+      const result = await runPromptViaApi(prompt, 'gpt-4o');
+
+      if (result.error) {
+        throw new Error(result.error);
+      }
       setResponse(result.response);
 
       const promptScore = scorePrompt(prompt, lesson, result.tokens_used);
