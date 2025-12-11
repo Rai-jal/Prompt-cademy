@@ -162,19 +162,19 @@ export default function TemplatesPage() {
           description: 'Your prompt template has been updated successfully.',
         });
       } else {
-        const { error } = await supabase.from('prompt_templates').insert([
-          {
+      const { error } = await supabase.from('prompt_templates').insert([
+        {
             ...payload,
-            creator_id: user!.id,
-          },
-        ]);
+          creator_id: user!.id,
+        },
+      ]);
 
-        if (error) throw error;
+      if (error) throw error;
 
-        toast({
-          title: 'Template saved',
-          description: 'Your prompt template has been saved successfully.',
-        });
+      toast({
+        title: 'Template saved',
+        description: 'Your prompt template has been saved successfully.',
+      });
       }
 
       handleDialogClose();
@@ -285,21 +285,21 @@ export default function TemplatesPage() {
                 <Edit className="h-3 w-3" />
                 Edit
               </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="gap-2 text-destructive hover:text-destructive"
-                onClick={() => handleDeleteTemplate(template.id)}
-              >
-                <Trash2 className="h-3 w-3" />
-                Delete
-              </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2 text-destructive hover:text-destructive"
+              onClick={() => handleDeleteTemplate(template.id)}
+            >
+              <Trash2 className="h-3 w-3" />
+              Delete
+            </Button>
             </>
           )}
         </div>
       </CardContent>
     </Card>
-    );
+  );
   };
 
   return (

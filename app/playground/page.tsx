@@ -1,22 +1,28 @@
-'use client';
+"use client";
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useAuth } from '@/lib/auth-context';
-import { useRouter } from 'next/navigation';
-import { SidebarLayout } from '@/components/sidebar-layout';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
-import { Label } from '@/components/ui/label';
-import { Slider } from '@/components/ui/slider';
-import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Switch } from '@/components/ui/switch';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Progress } from '@/components/ui/progress';
-import { AI_MODELS } from '@/lib/ai-models';
-import { supabase } from '@/lib/supabase';
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useAuth } from "@/lib/auth-context";
+import { useRouter } from "next/navigation";
+import { SidebarLayout } from "@/components/sidebar-layout";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { Slider } from "@/components/ui/slider";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Progress } from "@/components/ui/progress";
+import { AI_MODELS } from "@/lib/ai-models";
+import { supabase } from "@/lib/supabase";
 import {
   Zap,
   Send,
@@ -29,22 +35,28 @@ import {
   Loader2,
   AlertTriangle,
   RefreshCw,
-} from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
-import { compareModelsViaApi } from '@/lib/client/ai';
-import type { PromptResult } from '@/types/ai';
+} from "lucide-react";
+import Link from "next/link";
+import { useToast } from "@/hooks/use-toast";
+import { useUserApiKeys } from "@/hooks/use-user-api-keys";
+import { compareModelsViaApi } from "@/lib/client/ai";
+import type { PromptResult } from "@/types/ai";
 
 const AVAILABLE_MODELS = [
-  'gpt-4o',
-  'gpt-4o-mini',
-  'gpt-4-turbo',
-  'claude-3-5-sonnet',
-  'claude-3-5-haiku',
-  'gemini-pro',
-  'gemini-flash',
+  "gpt-4o",
+  "gpt-4o-mini",
+  "gpt-4-turbo",
+  "claude-3-5-sonnet",
+  "claude-3-5-haiku",
+  "gemini-pro",
+  "gemini-flash",
 ];
 
-const BUDGET_MODELS = ['gpt-4o-mini', 'claude-3-5-haiku', 'gemini-flash'] as const;
+const BUDGET_MODELS = [
+  "gpt-4o-mini",
+  "claude-3-5-haiku",
+  "gemini-flash",
+] as const;
 const HIGH_COST_WARNING_THRESHOLD = 5; // USD
 const MAX_MODELS_BEFORE_RATE_WARNING = 4;
 const DAILY_MODEL_CALL_LIMIT = 40;
@@ -62,9 +74,16 @@ export default function PlaygroundPage() {
   const { user, loading } = useAuth();
   const router = useRouter();
   const { toast } = useToast();
+  const {
+    keys: apiKeys,
+    loading: apiKeysLoading,
+    error: apiKeysError,
+  } = useUserApiKeys();
 
-  const [prompt, setPrompt] = useState('');
-  const [selectedModels, setSelectedModels] = useState<string[]>([...BUDGET_MODELS]);
+  const [prompt, setPrompt] = useState("");
+  const [selectedModels, setSelectedModels] = useState<string[]>([
+    ...BUDGET_MODELS,
+  ]);
   const [temperature, setTemperature] = useState(0.7);
   const [maxTokens, setMaxTokens] = useState(1000);
   const [results, setResults] = useState<PromptResult[]>([]);
@@ -72,7 +91,10 @@ export default function PlaygroundPage() {
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const [budgetMode, setBudgetMode] = useState(true);
   const [hasAcknowledgedCostRisk, setHasAcknowledgedCostRisk] = useState(false);
-  const [usageStats, setUsageStats] = useState({ attemptsToday: 0, costToday: 0 });
+  const [usageStats, setUsageStats] = useState({
+    attemptsToday: 0,
+    costToday: 0,
+  });
   const [usageLoading, setUsageLoading] = useState(false);
 
   const fetchUsageStats = useCallback(async () => {
@@ -83,19 +105,22 @@ export default function PlaygroundPage() {
     startOfDay.setHours(0, 0, 0, 0);
 
     const { data, error } = await supabase
-      .from('prompt_attempts')
-      .select('cost_estimate, created_at')
-      .eq('user_id', user.id)
-      .gte('created_at', startOfDay.toISOString());
+      .from("prompt_attempts")
+      .select("cost_estimate, created_at")
+      .eq("user_id", user.id)
+      .gte("created_at", startOfDay.toISOString());
 
     if (error) {
       toast({
-        title: 'Unable to refresh usage',
+        title: "Unable to refresh usage",
         description: error.message,
-        variant: 'destructive',
+        variant: "destructive",
       });
     } else if (data) {
-      const costSum = data.reduce((sum, attempt) => sum + (attempt.cost_estimate ?? 0), 0);
+      const costSum = data.reduce(
+        (sum, attempt) => sum + (attempt.cost_estimate ?? 0),
+        0
+      );
       setUsageStats({
         attemptsToday: data.length,
         costToday: costSum,
@@ -107,7 +132,7 @@ export default function PlaygroundPage() {
 
   useEffect(() => {
     if (!loading && !user) {
-      router.push('/login');
+      router.push("/login");
     }
   }, [user, loading, router]);
 
@@ -129,7 +154,8 @@ export default function PlaygroundPage() {
     const breakdown = selectedModels.map((modelKey) => {
       const model = AI_MODELS[modelKey];
       const estimatedCost =
-        ((assumedInputTokens || DEFAULT_PROMPT_TOKEN_ESTIMATE) / 1000) * model.costPer1kInput +
+        ((assumedInputTokens || DEFAULT_PROMPT_TOKEN_ESTIMATE) / 1000) *
+          model.costPer1kInput +
         (maxTokens / 1000) * model.costPer1kOutput;
       return {
         modelKey,
@@ -150,11 +176,14 @@ export default function PlaygroundPage() {
   const estimatedCost = costEstimate.estimatedCost;
   const selectedModelCount = selectedModels.length;
   const showHighCostWarning = estimatedCost > HIGH_COST_WARNING_THRESHOLD;
-  const showRateLimitWarning = selectedModelCount > MAX_MODELS_BEFORE_RATE_WARNING;
+  const showRateLimitWarning =
+    selectedModelCount > MAX_MODELS_BEFORE_RATE_WARNING;
   const needsCostAcknowledgement = showHighCostWarning;
   const costByModel = useMemo(() => {
     const map = new Map<string, number>();
-    costEstimate.breakdown.forEach(({ modelKey, cost }) => map.set(modelKey, cost));
+    costEstimate.breakdown.forEach(({ modelKey, cost }) =>
+      map.set(modelKey, cost)
+    );
     return map;
   }, [costEstimate]);
 
@@ -162,8 +191,12 @@ export default function PlaygroundPage() {
     (usageStats.attemptsToday / DAILY_MODEL_CALL_LIMIT) * 100,
     100
   );
-  const costUsagePercent = Math.min((usageStats.costToday / DAILY_COST_LIMIT) * 100, 100);
-  const reachedAttemptLimit = usageStats.attemptsToday >= DAILY_MODEL_CALL_LIMIT;
+  const costUsagePercent = Math.min(
+    (usageStats.costToday / DAILY_COST_LIMIT) * 100,
+    100
+  );
+  const reachedAttemptLimit =
+    usageStats.attemptsToday >= DAILY_MODEL_CALL_LIMIT;
   const reachedCostLimit = usageStats.costToday >= DAILY_COST_LIMIT;
   const nearAttemptLimit = attemptUsagePercent / 100 >= QUOTA_WARNING_RATIO;
   const nearCostLimit = costUsagePercent / 100 >= QUOTA_WARNING_RATIO;
@@ -176,17 +209,22 @@ export default function PlaygroundPage() {
     reachedCostLimit;
 
   const toggleModel = (modelKey: string) => {
-    if (budgetMode && !BUDGET_MODELS.includes(modelKey as (typeof BUDGET_MODELS)[number])) {
+    if (
+      budgetMode &&
+      !BUDGET_MODELS.includes(modelKey as (typeof BUDGET_MODELS)[number])
+    ) {
       toast({
-        title: 'Budget mode enabled',
-        description: 'Disable budget mode to try premium models.',
-        variant: 'destructive',
+        title: "Budget mode enabled",
+        description: "Disable budget mode to try premium models.",
+        variant: "destructive",
       });
       return;
     }
 
     setSelectedModels((prev) =>
-      prev.includes(modelKey) ? prev.filter((m) => m !== modelKey) : [...prev, modelKey]
+      prev.includes(modelKey)
+        ? prev.filter((m) => m !== modelKey)
+        : [...prev, modelKey]
     );
   };
 
@@ -195,8 +233,8 @@ export default function PlaygroundPage() {
     if (checked) {
       setSelectedModels([...BUDGET_MODELS]);
       toast({
-        title: 'Budget mode on',
-        description: 'We selected the most cost-effective models for you.',
+        title: "Budget mode on",
+        description: "We selected the most cost-effective models for you.",
       });
     }
   };
@@ -204,27 +242,27 @@ export default function PlaygroundPage() {
   const handleRunPrompt = async () => {
     if (!prompt.trim()) {
       toast({
-        title: 'Empty prompt',
-        description: 'Please enter a prompt to test.',
-        variant: 'destructive',
+        title: "Empty prompt",
+        description: "Please enter a prompt to test.",
+        variant: "destructive",
       });
       return;
     }
 
     if (selectedModels.length === 0) {
       toast({
-        title: 'No models selected',
-        description: 'Please select at least one model.',
-        variant: 'destructive',
+        title: "No models selected",
+        description: "Please select at least one model.",
+        variant: "destructive",
       });
       return;
     }
 
     if (needsCostAcknowledgement && !hasAcknowledgedCostRisk) {
       toast({
-        title: 'Confirm high cost run',
-        description: 'Please acknowledge the estimated cost before continuing.',
-        variant: 'destructive',
+        title: "Confirm high cost run",
+        description: "Please acknowledge the estimated cost before continuing.",
+        variant: "destructive",
       });
       return;
     }
@@ -232,9 +270,10 @@ export default function PlaygroundPage() {
     const projectedModelCalls = usageStats.attemptsToday + selectedModelCount;
     if (projectedModelCalls > DAILY_MODEL_CALL_LIMIT) {
       toast({
-        title: 'Daily model call limit reached',
-        description: 'Try again tomorrow or reduce the number of models selected.',
-        variant: 'destructive',
+        title: "Daily model call limit reached",
+        description:
+          "Try again tomorrow or reduce the number of models selected.",
+        variant: "destructive",
       });
       return;
     }
@@ -242,18 +281,18 @@ export default function PlaygroundPage() {
     const projectedCost = usageStats.costToday + estimatedCost;
     if (projectedCost > DAILY_COST_LIMIT) {
       toast({
-        title: 'Daily budget exceeded',
-        description: 'This run would exceed your daily cost allowance.',
-        variant: 'destructive',
+        title: "Daily budget exceeded",
+        description: "This run would exceed your daily cost allowance.",
+        variant: "destructive",
       });
       return;
     }
 
     if (!user) {
       toast({
-        title: 'Not authenticated',
-        description: 'Please sign in again to continue.',
-        variant: 'destructive',
+        title: "Not authenticated",
+        description: "Please sign in again to continue.",
+        variant: "destructive",
       });
       return;
     }
@@ -262,14 +301,10 @@ export default function PlaygroundPage() {
     setResults([]);
 
     try {
-      const modelResults = await compareModelsViaApi(
-        prompt,
-        selectedModels,
-        {
-          temperature,
-          max_tokens: maxTokens,
-        }
-      );
+      const modelResults = await compareModelsViaApi(prompt, selectedModels, {
+        temperature,
+        max_tokens: maxTokens,
+      });
 
       setResults(modelResults);
 
@@ -286,7 +321,9 @@ export default function PlaygroundPage() {
         duration_ms: result.duration_ms,
       }));
 
-      const { error: insertError } = await supabase.from('prompt_attempts').insert(payload);
+      const { error: insertError } = await supabase
+        .from("prompt_attempts")
+        .insert(payload);
       if (insertError) {
         throw new Error(insertError.message);
       }
@@ -295,14 +332,14 @@ export default function PlaygroundPage() {
       setHasAcknowledgedCostRisk(false);
 
       toast({
-        title: 'Success!',
+        title: "Success!",
         description: `Compared ${modelResults.length} models`,
       });
     } catch (error: any) {
       toast({
-        title: 'Error',
-        description: error.message || 'Failed to run prompt',
-        variant: 'destructive',
+        title: "Error",
+        description: error.message || "Failed to run prompt",
+        variant: "destructive",
       });
     } finally {
       setIsRunning(false);
@@ -324,9 +361,12 @@ export default function PlaygroundPage() {
   }
 
   const totalCost = results.reduce((sum, r) => sum + r.cost_estimate, 0);
-  const avgDuration = results.length > 0
-    ? results.reduce((sum, r) => sum + r.duration_ms, 0) / results.length
-    : 0;
+  const avgDuration =
+    results.length > 0
+      ? results.reduce((sum, r) => sum + r.duration_ms, 0) / results.length
+      : 0;
+
+  const hasActiveUserKey = apiKeys.some((key) => key.is_active);
 
   return (
     <SidebarLayout>
@@ -340,6 +380,32 @@ export default function PlaygroundPage() {
             Compare prompts across multiple AI models in real-time
           </p>
         </div>
+
+        {!apiKeysLoading && !hasActiveUserKey && (
+          <Alert>
+            <AlertTriangle className="h-4 w-4" />
+            <AlertTitle>Add your own API keys</AlertTitle>
+            <AlertDescription className="space-y-2">
+              <p>
+                You&rsquo;re currently using the workspace fallback keys, which
+                are rate-limited and shared by everyone. Add your own OpenAI,
+                Anthropic, or Gemini keys in Settings → API Keys to avoid usage
+                interruptions and track cost per provider.
+              </p>
+              <Button asChild variant="outline" size="sm">
+                <Link href="/settings">Open Settings</Link>
+              </Button>
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {apiKeysError && (
+          <Alert variant="destructive">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertTitle>Unable to load API keys</AlertTitle>
+            <AlertDescription>{apiKeysError}</AlertDescription>
+          </Alert>
+        )}
 
         {(nearAttemptLimit || nearCostLimit) && (
           <Alert variant="destructive">
@@ -368,7 +434,10 @@ export default function PlaygroundPage() {
                   const model = AI_MODELS[modelKey];
                   const isSelected = selectedModels.includes(modelKey);
                   const isBudgetLocked =
-                    budgetMode && !BUDGET_MODELS.includes(modelKey as (typeof BUDGET_MODELS)[number]);
+                    budgetMode &&
+                    !BUDGET_MODELS.includes(
+                      modelKey as (typeof BUDGET_MODELS)[number]
+                    );
                   const estimatedModelCost = costByModel.get(modelKey);
 
                   return (
@@ -380,9 +449,13 @@ export default function PlaygroundPage() {
                       }}
                       className={`p-3 border-2 rounded-lg transition-all ${
                         isSelected
-                          ? 'border-primary bg-primary/5'
-                          : 'border-border hover:border-primary/50'
-                      } ${isBudgetLocked ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}`}
+                          ? "border-primary bg-primary/5"
+                          : "border-border hover:border-primary/50"
+                      } ${
+                        isBudgetLocked
+                          ? "opacity-60 cursor-not-allowed"
+                          : "cursor-pointer"
+                      }`}
                     >
                       <div className="flex items-center justify-between">
                         <div>
@@ -398,10 +471,14 @@ export default function PlaygroundPage() {
                         </div>
                         <div
                           className={`h-5 w-5 rounded-full border-2 flex items-center justify-center ${
-                            isSelected ? 'border-primary bg-primary' : 'border-muted-foreground'
+                            isSelected
+                              ? "border-primary bg-primary"
+                              : "border-muted-foreground"
                           }`}
                         >
-                          {isSelected && <div className="h-2 w-2 bg-white rounded-full" />}
+                          {isSelected && (
+                            <div className="h-2 w-2 bg-white rounded-full" />
+                          )}
                         </div>
                       </div>
                     </div>
@@ -422,13 +499,18 @@ export default function PlaygroundPage() {
                       Keeps selection to low-cost models.
                     </p>
                   </div>
-                  <Switch checked={budgetMode} onCheckedChange={handleBudgetToggle} />
+                  <Switch
+                    checked={budgetMode}
+                    onCheckedChange={handleBudgetToggle}
+                  />
                 </div>
 
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <Label>Temperature</Label>
-                    <span className="text-sm text-muted-foreground">{temperature}</span>
+                    <span className="text-sm text-muted-foreground">
+                      {temperature}
+                    </span>
                   </div>
                   <Slider
                     value={[temperature]}
@@ -445,7 +527,9 @@ export default function PlaygroundPage() {
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <Label>Max Tokens</Label>
-                    <span className="text-sm text-muted-foreground">{maxTokens}</span>
+                    <span className="text-sm text-muted-foreground">
+                      {maxTokens}
+                    </span>
                   </div>
                   <Slider
                     value={[maxTokens]}
@@ -464,7 +548,9 @@ export default function PlaygroundPage() {
             <Card>
               <CardHeader>
                 <CardTitle className="text-lg">Usage today</CardTitle>
-                <CardDescription>Daily quota resets at midnight.</CardDescription>
+                <CardDescription>
+                  Daily quota resets at midnight.
+                </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-1">
@@ -481,7 +567,8 @@ export default function PlaygroundPage() {
                   <div className="flex items-center justify-between text-xs text-muted-foreground">
                     <span>Estimated spend</span>
                     <span>
-                      ${usageStats.costToday.toFixed(2)}/{DAILY_COST_LIMIT.toFixed(2)}
+                      ${usageStats.costToday.toFixed(2)}/
+                      {DAILY_COST_LIMIT.toFixed(2)}
                     </span>
                   </div>
                   <Progress value={costUsagePercent} />
@@ -528,7 +615,8 @@ export default function PlaygroundPage() {
 
                 <div className="flex items-center justify-between">
                   <div className="text-sm text-muted-foreground">
-                    {selectedModels.length} model{selectedModels.length !== 1 ? 's' : ''} selected
+                    {selectedModels.length} model
+                    {selectedModels.length !== 1 ? "s" : ""} selected
                   </div>
                   <Button
                     onClick={handleRunPrompt}
@@ -554,30 +642,43 @@ export default function PlaygroundPage() {
 
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg">Estimated cost & safety</CardTitle>
+                <CardTitle className="text-lg">
+                  Estimated cost & safety
+                </CardTitle>
                 <CardDescription>
-                  Based on ~{costEstimate.assumedInputTokens} input tokens + {maxTokens} output tokens.
+                  Based on ~{costEstimate.assumedInputTokens} input tokens +{" "}
+                  {maxTokens} output tokens.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-muted-foreground">Estimated cost this run</p>
+                    <p className="text-sm text-muted-foreground">
+                      Estimated cost this run
+                    </p>
                     <p className="text-3xl font-bold">
                       ${estimatedCost.toFixed(2)}
                     </p>
                   </div>
-                  <Badge variant={showHighCostWarning ? 'destructive' : 'secondary'}>
-                    {selectedModelCount} model{selectedModelCount !== 1 ? 's' : ''}
+                  <Badge
+                    variant={showHighCostWarning ? "destructive" : "secondary"}
+                  >
+                    {selectedModelCount} model
+                    {selectedModelCount !== 1 ? "s" : ""}
                   </Badge>
                 </div>
 
                 <div className="space-y-2 rounded-lg border p-3 text-sm">
                   {costEstimate.breakdown.length === 0 && (
-                    <p className="text-muted-foreground">Select a model to see cost estimates.</p>
+                    <p className="text-muted-foreground">
+                      Select a model to see cost estimates.
+                    </p>
                   )}
                   {costEstimate.breakdown.map(({ modelKey, model, cost }) => (
-                    <div key={modelKey} className="flex items-center justify-between">
+                    <div
+                      key={modelKey}
+                      className="flex items-center justify-between"
+                    >
                       <span>{model.name}</span>
                       <span className="font-medium">${cost.toFixed(2)}</span>
                     </div>
@@ -591,7 +692,8 @@ export default function PlaygroundPage() {
                         <AlertTriangle className="h-4 w-4" />
                         <AlertTitle>High cost run</AlertTitle>
                         <AlertDescription>
-                          Consider enabling budget mode, lowering max tokens, or reducing models.
+                          Consider enabling budget mode, lowering max tokens, or
+                          reducing models.
                         </AlertDescription>
                       </Alert>
                     )}
@@ -599,7 +701,8 @@ export default function PlaygroundPage() {
                       <Alert>
                         <AlertTitle>Large batch</AlertTitle>
                         <AlertDescription>
-                          Requests are queued to avoid rate limits. Runs with {selectedModelCount} models may take longer.
+                          Requests are queued to avoid rate limits. Runs with{" "}
+                          {selectedModelCount} models may take longer.
                         </AlertDescription>
                       </Alert>
                     )}
@@ -611,10 +714,13 @@ export default function PlaygroundPage() {
                     <Checkbox
                       id="cost-ack"
                       checked={hasAcknowledgedCostRisk}
-                      onCheckedChange={(value) => setHasAcknowledgedCostRisk(Boolean(value))}
+                      onCheckedChange={(value) =>
+                        setHasAcknowledgedCostRisk(Boolean(value))
+                      }
                     />
                     <label htmlFor="cost-ack" className="cursor-pointer">
-                      I understand this comparison may cost up to ${estimatedCost.toFixed(2)} today.
+                      I understand this comparison may cost up to $
+                      {estimatedCost.toFixed(2)} today.
                     </label>
                   </div>
                 )}
@@ -628,7 +734,9 @@ export default function PlaygroundPage() {
                     <CardContent className="pt-6">
                       <div className="flex items-center gap-2 mb-2">
                         <DollarSign className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-sm text-muted-foreground">Total Cost</span>
+                        <span className="text-sm text-muted-foreground">
+                          Total Cost
+                        </span>
                       </div>
                       <div className="text-2xl font-bold">
                         ${totalCost.toFixed(4)}
@@ -640,7 +748,9 @@ export default function PlaygroundPage() {
                     <CardContent className="pt-6">
                       <div className="flex items-center gap-2 mb-2">
                         <Clock className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-sm text-muted-foreground">Avg Duration</span>
+                        <span className="text-sm text-muted-foreground">
+                          Avg Duration
+                        </span>
                       </div>
                       <div className="text-2xl font-bold">
                         {(avgDuration / 1000).toFixed(2)}s
@@ -652,10 +762,14 @@ export default function PlaygroundPage() {
                     <CardContent className="pt-6">
                       <div className="flex items-center gap-2 mb-2">
                         <BarChart3 className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-sm text-muted-foreground">Total Tokens</span>
+                        <span className="text-sm text-muted-foreground">
+                          Total Tokens
+                        </span>
                       </div>
                       <div className="text-2xl font-bold">
-                        {results.reduce((sum, r) => sum + r.tokens_used, 0).toLocaleString()}
+                        {results
+                          .reduce((sum, r) => sum + r.tokens_used, 0)
+                          .toLocaleString()}
                       </div>
                     </CardContent>
                   </Card>
@@ -683,12 +797,18 @@ export default function PlaygroundPage() {
                     const model = modelKey ? AI_MODELS[modelKey] : null;
 
                     return (
-                      <TabsContent key={index} value={index.toString()} className="mt-4">
+                      <TabsContent
+                        key={index}
+                        value={index.toString()}
+                        className="mt-4"
+                      >
                         <Card>
                           <CardHeader>
                             <div className="flex items-center justify-between">
                               <div>
-                                <CardTitle className="text-lg">{model?.name}</CardTitle>
+                                <CardTitle className="text-lg">
+                                  {model?.name}
+                                </CardTitle>
                                 <CardDescription className="capitalize">
                                   {result.provider}
                                 </CardDescription>
@@ -696,7 +816,9 @@ export default function PlaygroundPage() {
                               <Button
                                 variant="outline"
                                 size="sm"
-                                onClick={() => copyToClipboard(result.response, index)}
+                                onClick={() =>
+                                  copyToClipboard(result.response, index)
+                                }
                               >
                                 {copiedIndex === index ? (
                                   <Check className="h-4 w-4" />
@@ -708,7 +830,9 @@ export default function PlaygroundPage() {
                           </CardHeader>
                           <CardContent className="space-y-4">
                             <div className="prose prose-sm max-w-none">
-                              <p className="whitespace-pre-wrap">{result.response}</p>
+                              <p className="whitespace-pre-wrap">
+                                {result.response}
+                              </p>
                             </div>
 
                             <div className="flex flex-wrap gap-2 pt-4 border-t">
@@ -717,15 +841,16 @@ export default function PlaygroundPage() {
                                 {(result.duration_ms / 1000).toFixed(2)}s
                               </Badge>
                               <Badge variant="secondary">
-                                <DollarSign className="h-3 w-3 mr-1" />
-                                ${result.cost_estimate.toFixed(4)}
+                                <DollarSign className="h-3 w-3 mr-1" />$
+                                {result.cost_estimate.toFixed(4)}
                               </Badge>
                               <Badge variant="secondary">
                                 <BarChart3 className="h-3 w-3 mr-1" />
                                 {result.tokens_used} tokens
                               </Badge>
                               <Badge variant="outline">
-                                In: {result.input_tokens} | Out: {result.output_tokens}
+                                In: {result.input_tokens} | Out:{" "}
+                                {result.output_tokens}
                               </Badge>
                             </div>
                           </CardContent>

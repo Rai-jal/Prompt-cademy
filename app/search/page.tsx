@@ -1,28 +1,43 @@
-'use client';
+"use client";
 
-import { useCallback, useEffect, useState } from 'react';
-import { useAuth } from '@/lib/auth-context';
-import { useRouter, useSearchParams } from 'next/navigation';
-import { SidebarLayout } from '@/components/sidebar-layout';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Suspense, useCallback, useEffect, useState } from "react";
+import { useAuth } from "@/lib/auth-context";
+import { useRouter, useSearchParams } from "next/navigation";
+import { SidebarLayout } from "@/components/sidebar-layout";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
-import { supabase } from '@/lib/supabase';
-import { Search, Filter, BookOpen, FileText, Trophy, Users, Calendar, Tag } from 'lucide-react';
-import Link from 'next/link';
+} from "@/components/ui/select";
+import { supabase } from "@/lib/supabase";
+import {
+  Search,
+  Filter,
+  BookOpen,
+  FileText,
+  Trophy,
+  Users,
+  Calendar,
+  Tag,
+} from "lucide-react";
+import Link from "next/link";
 
 type SearchResult = {
   id: string;
-  type: 'course' | 'template' | 'challenge' | 'user';
+  type: "course" | "template" | "challenge" | "user";
   title: string;
   description: string;
   tags?: string[];
@@ -30,22 +45,22 @@ type SearchResult = {
   metadata?: any;
 };
 
-export default function SearchPage() {
+function SearchPageContent() {
   const { user, loading } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [query, setQuery] = useState(searchParams.get('q') || '');
+  const [query, setQuery] = useState(searchParams.get("q") || "");
   const [results, setResults] = useState<SearchResult[]>([]);
   const [searching, setSearching] = useState(false);
   const [filters, setFilters] = useState({
-    type: 'all',
-    sortBy: 'relevance',
-    dateRange: 'all',
+    type: "all",
+    sortBy: "relevance",
+    dateRange: "all",
   });
 
   useEffect(() => {
     if (!loading && !user) {
-      router.push('/login');
+      router.push("/login");
     }
   }, [user, loading, router]);
 
@@ -59,19 +74,19 @@ export default function SearchPage() {
     try {
       const searchResults: SearchResult[] = [];
 
-      if (filters.type === 'all' || filters.type === 'courses') {
+      if (filters.type === "all" || filters.type === "courses") {
         const { data: courses } = await supabase
-          .from('courses')
-          .select('*')
+          .from("courses")
+          .select("*")
           .or(`title.ilike.%${query}%,description.ilike.%${query}%`)
-          .eq('is_published', true)
+          .eq("is_published", true)
           .limit(10);
 
         if (courses) {
           searchResults.push(
             ...courses.map((course) => ({
               id: course.id,
-              type: 'course' as const,
+              type: "course" as const,
               title: course.title,
               description: course.description,
               created_at: course.created_at,
@@ -84,21 +99,24 @@ export default function SearchPage() {
         }
       }
 
-      if (filters.type === 'all' || filters.type === 'templates') {
+      if (filters.type === "all" || filters.type === "templates") {
         const { data: templates } = await supabase
-          .from('prompt_templates')
-          .select('*')
-          .or(`title.ilike.%${query}%,content.ilike.%${query}%,description.ilike.%${query}%`)
-          .eq('is_public', true)
+          .from("prompt_templates")
+          .select("*")
+          .or(
+            `title.ilike.%${query}%,content.ilike.%${query}%,description.ilike.%${query}%`
+          )
+          .eq("is_public", true)
           .limit(10);
 
         if (templates) {
           searchResults.push(
             ...templates.map((template) => ({
               id: template.id,
-              type: 'template' as const,
+              type: "template" as const,
               title: template.title,
-              description: template.description || template.content.slice(0, 150),
+              description:
+                template.description || template.content.slice(0, 150),
               tags: template.tags,
               created_at: template.created_at,
               metadata: {
@@ -109,10 +127,10 @@ export default function SearchPage() {
         }
       }
 
-      if (filters.type === 'all' || filters.type === 'challenges') {
+      if (filters.type === "all" || filters.type === "challenges") {
         const { data: challenges } = await supabase
-          .from('challenges')
-          .select('*')
+          .from("challenges")
+          .select("*")
           .or(`title.ilike.%${query}%,description.ilike.%${query}%`)
           .limit(10);
 
@@ -120,7 +138,7 @@ export default function SearchPage() {
           searchResults.push(
             ...challenges.map((challenge) => ({
               id: challenge.id,
-              type: 'challenge' as const,
+              type: "challenge" as const,
               title: challenge.title,
               description: challenge.description,
               created_at: challenge.created_at,
@@ -133,10 +151,10 @@ export default function SearchPage() {
         }
       }
 
-      if (filters.type === 'all' || filters.type === 'users') {
+      if (filters.type === "all" || filters.type === "users") {
         const { data: profiles } = await supabase
-          .from('profiles')
-          .select('*')
+          .from("profiles")
+          .select("*")
           .or(`full_name.ilike.%${query}%,email.ilike.%${query}%`)
           .limit(10);
 
@@ -144,9 +162,9 @@ export default function SearchPage() {
           searchResults.push(
             ...profiles.map((profile) => ({
               id: profile.id,
-              type: 'user' as const,
+              type: "user" as const,
               title: profile.full_name || profile.email,
-              description: profile.bio || 'No bio available',
+              description: profile.bio || "No bio available",
               created_at: profile.created_at,
               metadata: {
                 skill_level: profile.skill_level,
@@ -157,15 +175,16 @@ export default function SearchPage() {
         }
       }
 
-      if (filters.sortBy === 'date') {
-        searchResults.sort((a, b) =>
-          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      if (filters.sortBy === "date") {
+        searchResults.sort(
+          (a, b) =>
+            new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
         );
       }
 
       setResults(searchResults);
     } catch (error) {
-      console.error('Error searching:', error);
+      console.error("Error searching:", error);
     } finally {
       setSearching(false);
     }
@@ -179,13 +198,13 @@ export default function SearchPage() {
 
   const getTypeIcon = (type: string) => {
     switch (type) {
-      case 'course':
+      case "course":
         return <BookOpen className="h-4 w-4" />;
-      case 'template':
+      case "template":
         return <FileText className="h-4 w-4" />;
-      case 'challenge':
+      case "challenge":
         return <Trophy className="h-4 w-4" />;
-      case 'user':
+      case "user":
         return <Users className="h-4 w-4" />;
       default:
         return null;
@@ -194,16 +213,16 @@ export default function SearchPage() {
 
   const getTypeLink = (result: SearchResult) => {
     switch (result.type) {
-      case 'course':
+      case "course":
         return `/courses/${result.id}`;
-      case 'template':
+      case "template":
         return `/templates`;
-      case 'challenge':
+      case "challenge":
         return `/challenges/${result.id}`;
-      case 'user':
+      case "user":
         return `/profile`;
       default:
-        return '#';
+        return "#";
     }
   };
 
@@ -237,19 +256,21 @@ export default function SearchPage() {
                   placeholder="Search for anything..."
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+                  onKeyPress={(e) => e.key === "Enter" && handleSearch()}
                   className="pl-10"
                 />
               </div>
               <Button onClick={handleSearch} disabled={searching}>
-                {searching ? 'Searching...' : 'Search'}
+                {searching ? "Searching..." : "Search"}
               </Button>
             </div>
 
             <div className="flex gap-4 flex-wrap">
               <Select
                 value={filters.type}
-                onValueChange={(value) => setFilters({ ...filters, type: value })}
+                onValueChange={(value) =>
+                  setFilters({ ...filters, type: value })
+                }
               >
                 <SelectTrigger className="w-40">
                   <SelectValue />
@@ -265,7 +286,9 @@ export default function SearchPage() {
 
               <Select
                 value={filters.sortBy}
-                onValueChange={(value) => setFilters({ ...filters, sortBy: value })}
+                onValueChange={(value) =>
+                  setFilters({ ...filters, sortBy: value })
+                }
               >
                 <SelectTrigger className="w-40">
                   <SelectValue />
@@ -283,25 +306,35 @@ export default function SearchPage() {
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <p className="text-sm text-muted-foreground">
-                Found {results.length} result{results.length !== 1 ? 's' : ''}
+                Found {results.length} result{results.length !== 1 ? "s" : ""}
               </p>
             </div>
 
             {results.map((result) => (
-              <Card key={`${result.type}-${result.id}`} className="hover:shadow-md transition-shadow">
+              <Card
+                key={`${result.type}-${result.id}`}
+                className="hover:shadow-md transition-shadow"
+              >
                 <CardHeader>
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-2">
-                        <Badge variant="secondary" className="flex items-center gap-1">
+                        <Badge
+                          variant="secondary"
+                          className="flex items-center gap-1"
+                        >
                           {getTypeIcon(result.type)}
                           {result.type}
                         </Badge>
                         {result.metadata?.difficulty && (
-                          <Badge variant="outline">{result.metadata.difficulty}</Badge>
+                          <Badge variant="outline">
+                            {result.metadata.difficulty}
+                          </Badge>
                         )}
                         {result.metadata?.goal && (
-                          <Badge variant="outline">{result.metadata.goal}</Badge>
+                          <Badge variant="outline">
+                            {result.metadata.goal}
+                          </Badge>
                         )}
                       </div>
                       <CardTitle className="text-xl mb-1">
@@ -318,7 +351,11 @@ export default function SearchPage() {
                       {result.tags && result.tags.length > 0 && (
                         <div className="flex gap-1 mt-2 flex-wrap">
                           {result.tags.map((tag, index) => (
-                            <Badge key={index} variant="outline" className="text-xs">
+                            <Badge
+                              key={index}
+                              variant="outline"
+                              className="text-xs"
+                            >
                               <Tag className="h-3 w-3 mr-1" />
                               {tag}
                             </Badge>
@@ -353,5 +390,19 @@ export default function SearchPage() {
         )}
       </div>
     </SidebarLayout>
+  );
+}
+
+export default function SearchPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary" />
+        </div>
+      }
+    >
+      <SearchPageContent />
+    </Suspense>
   );
 }

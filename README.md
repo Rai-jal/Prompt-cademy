@@ -7,6 +7,7 @@ A production-ready platform for learning prompt engineering through interactive 
 ### Phase 2 (NEW!) - Advanced Features
 
 1. **Multi-Model AI Playground**
+
    - Compare prompts across 7 AI models simultaneously:
      - OpenAI: GPT-4o, GPT-4o Mini, GPT-4 Turbo
      - Anthropic: Claude 3.5 Sonnet, Claude 3.5 Haiku
@@ -17,6 +18,7 @@ A production-ready platform for learning prompt engineering through interactive 
    - Advanced parameter controls (temperature, max_tokens)
 
 2. **Admin Content Management System**
+
    - Full admin dashboard with platform statistics
    - Create, edit, and delete courses
    - Publish/unpublish courses
@@ -36,16 +38,19 @@ A production-ready platform for learning prompt engineering through interactive 
 ### Phase 1 - Core Features
 
 1. **Authentication & User Management**
+
    - Email/password signup and login via Supabase Auth
    - Secure session management
    - User profiles with preferences
 
 2. **Personalized Onboarding**
+
    - Goal selection (Writing, Coding, Design, Research, General)
    - Skill level assessment (Beginner, Intermediate, Advanced)
    - Personalized learning path creation
 
 3. **Course & Lesson System**
+
    - Browse courses filtered by goal
    - View course details with progress tracking
    - Interactive lesson viewer with:
@@ -55,11 +60,13 @@ A production-ready platform for learning prompt engineering through interactive 
      - Expected success criteria
 
 4. **AI Playground (OpenAI Integration)**
+
    - Write and test prompts in real-time
    - Get immediate AI responses
    - Integrated with lesson flow
 
 5. **Intelligent Scoring Engine**
+
    - Automatic prompt quality assessment
    - Multi-dimensional scoring:
      - Clarity (0-20 points)
@@ -71,6 +78,7 @@ A production-ready platform for learning prompt engineering through interactive 
    - Progress tracking and best score recording
 
 6. **Progress Dashboard**
+
    - View completed lessons
    - Track total attempts and average score
    - Course progress visualization
@@ -117,6 +125,7 @@ Tables created with full RLS (Row Level Security):
 ### Installation
 
 1. **Install dependencies:**
+
    ```bash
    npm install
    ```
@@ -124,6 +133,7 @@ Tables created with full RLS (Row Level Security):
 2. **Configure Environment Variables:**
 
    Add your AI provider API keys to `.env`:
+
    ```
    # Required for basic playground
    NEXT_PUBLIC_OPENAI_API_KEY=sk-your-openai-api-key
@@ -140,7 +150,35 @@ Tables created with full RLS (Row Level Security):
 
    **Note**: Only OpenAI key is required for basic functionality. Add other provider keys to enable multi-model comparison.
 
+### Fonts & Network Access
+
+Promptcademy uses the Inter font through `next/font/google`. During `next dev`/`next build`, Next.js downloads Inter from Google Fonts. If your environment restricts outbound traffic, allow the following hosts:
+
+- `fonts.googleapis.com`
+- `fonts.gstatic.com`
+
+If those endpoints must remain blocked, replace the Inter import in `app/layout.tsx` with `next/font/local` and bundle the `.woff2` files in the repo.
+
+### Provider API Keys & Fallback Behavior
+
+- Add your personal keys under **Settings → API Keys** inside the app. Each key is encrypted and scoped to your account so playground/lesson runs are billed to you.
+- If you do not add a key for a provider, Promptcademy falls back to the shared workspace key configured via environment variables. Fallback keys are shared by everyone and often hit rate limits quickly.
+- The playground and lesson pages display a warning when you are relying on the fallback. Add your own keys to avoid interruptions and to keep per-provider cost tracking accurate.
+
+### Testing & QA
+
+- **Manual**: run through `docs/QA_CHECKLIST.md` for every release (Chrome + Safari passes, Gemini key checks, history/analytics validation, etc.).
+- **Automated smoke test** (Playwright):
+
+  1. Install browsers: `npx playwright install --with-deps`
+  2. Start the app at `E2E_BASE_URL` (defaults to `http://localhost:3000`).
+  3. Export `E2E_EMAIL`, `E2E_PASSWORD`, and `E2E_LESSON_URL` (absolute URL or path). Optionally override `E2E_BASE_URL`.
+  4. Run `npm run test:e2e`.
+
+  The smoke test logs in with the supplied credentials, opens the lesson, and runs a prompt end-to-end. It automatically skips if the required env vars are missing so CI remains green.
+
 3. **Run Development Server:**
+
    ```bash
    npm run dev
    ```
@@ -178,6 +216,7 @@ Tables created with full RLS (Row Level Security):
 ### For Advanced Users:
 
 **Using the Multi-Model Playground:**
+
 1. Navigate to Playground from the main menu
 2. Select 2-7 AI models to compare
 3. Adjust temperature and max tokens parameters
@@ -187,6 +226,7 @@ Tables created with full RLS (Row Level Security):
 7. Compare cost, speed, and quality across models
 
 **Managing Prompt Templates:**
+
 1. Navigate to Templates from the main menu
 2. Click "New Template" to save a reusable prompt
 3. Add title, description, and tags
@@ -195,6 +235,7 @@ Tables created with full RLS (Row Level Security):
 6. Copy any template to use in lessons or playground
 
 **For Admins/Teachers:**
+
 1. Access the Admin panel from navigation (visible if you have admin/teacher role)
 2. View platform statistics (users, courses, lessons, attempts)
 3. Create new courses with customizable settings
@@ -203,6 +244,7 @@ Tables created with full RLS (Row Level Security):
 6. Track platform engagement metrics
 
 To become an admin, update your profile role in the database:
+
 ```sql
 UPDATE profiles SET role = 'admin' WHERE email = 'your@email.com';
 ```
@@ -218,6 +260,7 @@ Prompts are evaluated on:
 - **Criteria Match** (30 pts): Meeting lesson-specific requirements
 
 **Total: 100 points**
+
 - 90-100: Outstanding
 - 75-89: Great (Lesson complete!)
 - 60-74: Good (needs improvement)
@@ -290,6 +333,11 @@ The following are planned for future releases:
 4. **No Usage Quotas**: API usage not limited per user
 5. **Basic Scoring**: Heuristic-based, not ML-powered (still effective)
 6. **No Billing**: All features are free (add Stripe for monetization)
+7. **Team Settings Coming Soon**: Team workspaces exist, but membership/plan controls are still under construction (UI shows “Coming Soon” notice)
+
+## Observability & Operations
+
+See `docs/OBSERVABILITY.md` for logging, monitoring, and backup procedures. It covers the new structured logs emitted by `/api/ai/run`, recommended Supabase alerts (RLS errors, usage spikes), and the backup/restore drill that includes all new tables (`user_api_keys`, `team_members`, etc.).
 
 ## Deployment
 
@@ -322,15 +370,18 @@ To view migrations, check the Supabase dashboard under "Database" → "Migration
 ## Cost Estimates (Per User)
 
 **Free Tier Usage:**
+
 - Supabase: Free up to 500MB database + 50,000 monthly active users
 - Vercel: Free for personal projects
 
 **API Costs (You Pay):**
+
 - OpenAI GPT-4o: ~$0.0025 per prompt attempt (input) + $0.01 per response (output)
 - Average lesson: 10-20 attempts = $0.05-$0.10
 - Complete course (10 lessons): $0.50-$1.00
 
 **Scaling Considerations:**
+
 - 1,000 active users: ~$500-1,000/month (OpenAI only)
 - Caching and prompt reuse can reduce costs by 30-50%
 

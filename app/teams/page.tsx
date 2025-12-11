@@ -1,16 +1,23 @@
-'use client';
+"use client";
 
-import { useCallback, useEffect, useState } from 'react';
-import { useAuth } from '@/lib/auth-context';
-import { useRouter } from 'next/navigation';
-import { SidebarLayout } from '@/components/sidebar-layout';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Badge } from '@/components/ui/badge';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { useCallback, useEffect, useState } from "react";
+import { useAuth } from "@/lib/auth-context";
+import { useRouter } from "next/navigation";
+import { SidebarLayout } from "@/components/sidebar-layout";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   Dialog,
   DialogContent,
@@ -18,12 +25,20 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from '@/components/ui/dialog';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { supabase } from '@/lib/supabase';
-import { Users, Plus, Crown, Shield, User, Activity } from 'lucide-react';
-import Link from 'next/link';
-import { useToast } from '@/hooks/use-toast';
+} from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { supabase } from "@/lib/supabase";
+import {
+  Users,
+  Plus,
+  Crown,
+  Shield,
+  User,
+  Activity,
+  AlertTriangle,
+} from "lucide-react";
+import Link from "next/link";
+import { useToast } from "@/hooks/use-toast";
 
 type Team = {
   id: string;
@@ -55,21 +70,22 @@ export default function TeamsPage() {
   const [loadingData, setLoadingData] = useState(true);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [newTeam, setNewTeam] = useState({
-    name: '',
-    description: '',
+    name: "",
+    description: "",
   });
 
   useEffect(() => {
     if (!loading && !user) {
-      router.push('/login');
+      router.push("/login");
     }
   }, [user, loading, router]);
 
   const loadTeams = useCallback(async () => {
     try {
       const { data: teamMemberships } = await supabase
-        .from('team_members')
-        .select(`
+        .from("team_members")
+        .select(
+          `
           role,
           teams (
             id,
@@ -79,16 +95,17 @@ export default function TeamsPage() {
             plan,
             created_at
           )
-        `)
-        .eq('user_id', user!.id);
+        `
+        )
+        .eq("user_id", user!.id);
 
       if (teamMemberships) {
         const teamsWithCounts = await Promise.all(
           teamMemberships.map(async (membership: any) => {
             const { count } = await supabase
-              .from('team_members')
-              .select('*', { count: 'exact', head: true })
-              .eq('team_id', membership.teams.id);
+              .from("team_members")
+              .select("*", { count: "exact", head: true })
+              .eq("team_id", membership.teams.id);
 
             return {
               ...membership.teams,
@@ -101,11 +118,11 @@ export default function TeamsPage() {
         setTeams(teamsWithCounts);
       }
     } catch (error) {
-      console.error('Error loading teams:', error);
+      console.error("Error loading teams:", error);
       toast({
-        title: 'Error',
-        description: 'Failed to load teams',
-        variant: 'destructive',
+        title: "Error",
+        description: "Failed to load teams",
+        variant: "destructive",
       });
     } finally {
       setLoadingData(false);
@@ -121,16 +138,16 @@ export default function TeamsPage() {
   const createTeam = async () => {
     if (!newTeam.name.trim()) {
       toast({
-        title: 'Error',
-        description: 'Team name is required',
-        variant: 'destructive',
+        title: "Error",
+        description: "Team name is required",
+        variant: "destructive",
       });
       return;
     }
 
     try {
       const { data, error } = await supabase
-        .from('teams')
+        .from("teams")
         .insert({
           name: newTeam.name,
           description: newTeam.description,
@@ -142,28 +159,28 @@ export default function TeamsPage() {
       if (error) throw error;
 
       toast({
-        title: 'Success',
-        description: 'Team created successfully',
+        title: "Success",
+        description: "Team created successfully",
       });
 
       setCreateDialogOpen(false);
-      setNewTeam({ name: '', description: '' });
+      setNewTeam({ name: "", description: "" });
       loadTeams();
     } catch (error) {
-      console.error('Error creating team:', error);
+      console.error("Error creating team:", error);
       toast({
-        title: 'Error',
-        description: 'Failed to create team',
-        variant: 'destructive',
+        title: "Error",
+        description: "Failed to create team",
+        variant: "destructive",
       });
     }
   };
 
   const getRoleIcon = (role: string) => {
     switch (role) {
-      case 'owner':
+      case "owner":
         return <Crown className="h-4 w-4 text-yellow-600" />;
-      case 'admin':
+      case "admin":
         return <Shield className="h-4 w-4 text-blue-600" />;
       default:
         return <User className="h-4 w-4 text-gray-600" />;
@@ -172,10 +189,18 @@ export default function TeamsPage() {
 
   const getRoleBadge = (role: string) => {
     switch (role) {
-      case 'owner':
-        return <Badge variant="default" className="bg-yellow-600">Owner</Badge>;
-      case 'admin':
-        return <Badge variant="default" className="bg-blue-600">Admin</Badge>;
+      case "owner":
+        return (
+          <Badge variant="default" className="bg-yellow-600">
+            Owner
+          </Badge>
+        );
+      case "admin":
+        return (
+          <Badge variant="default" className="bg-blue-600">
+            Admin
+          </Badge>
+        );
       default:
         return <Badge variant="secondary">Member</Badge>;
     }
@@ -192,56 +217,71 @@ export default function TeamsPage() {
   return (
     <SidebarLayout>
       <div className="max-w-7xl mx-auto space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold mb-2 flex items-center gap-2">
-              <Users className="h-8 w-8 text-primary" />
-              Team Workspaces
-            </h1>
-            <p className="text-muted-foreground">
-              Collaborate with your team on prompts and templates
-            </p>
-          </div>
-
-          <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="h-4 w-4 mr-2" />
-                Create Team
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Create New Team</DialogTitle>
-                <DialogDescription>
-                  Create a team workspace to collaborate with others
-                </DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4">
-                <div>
-                  <Label htmlFor="name">Team Name</Label>
-                  <Input
-                    id="name"
-                    placeholder="My Awesome Team"
-                    value={newTeam.name}
-                    onChange={(e) => setNewTeam({ ...newTeam, name: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="description">Description</Label>
-                  <Textarea
-                    id="description"
-                    placeholder="What is your team about?"
-                    value={newTeam.description}
-                    onChange={(e) => setNewTeam({ ...newTeam, description: e.target.value })}
-                  />
-                </div>
-                <Button onClick={createTeam} className="w-full">
+        <div className="space-y-3">
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <div>
+              <h1 className="text-3xl font-bold mb-2 flex items-center gap-2">
+                <Users className="h-8 w-8 text-primary" />
+                Team Workspaces
+              </h1>
+              <p className="text-muted-foreground">
+                Collaborate with your team on prompts and templates
+              </p>
+            </div>
+            <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
+              <DialogTrigger asChild>
+                <Button>
+                  <Plus className="h-4 w-4 mr-2" />
                   Create Team
                 </Button>
-              </div>
-            </DialogContent>
-          </Dialog>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Create New Team</DialogTitle>
+                  <DialogDescription>
+                    Create a team workspace to collaborate with others
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div>
+                    <Label htmlFor="name">Team Name</Label>
+                    <Input
+                      id="name"
+                      placeholder="My Awesome Team"
+                      value={newTeam.name}
+                      onChange={(e) =>
+                        setNewTeam({ ...newTeam, name: e.target.value })
+                      }
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="description">Description</Label>
+                    <Textarea
+                      id="description"
+                      placeholder="What is your team about?"
+                      value={newTeam.description}
+                      onChange={(e) =>
+                        setNewTeam({ ...newTeam, description: e.target.value })
+                      }
+                    />
+                  </div>
+                  <Button onClick={createTeam} className="w-full">
+                    Create Team
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
+          </div>
+          <Alert>
+            <AlertTriangle className="h-4 w-4" />
+            <AlertTitle>Team settings coming soon</AlertTitle>
+            <AlertDescription>
+              Membership management and plan controls are still in development.
+              For the initial launch, teams focus on shared templates and
+              activity feeds. This notice is called out in the release notes so
+              users know advanced settings are on the roadmap.
+            </AlertDescription>
+          </Alert>
         </div>
 
         {teams.length === 0 ? (
@@ -275,7 +315,7 @@ export default function TeamsPage() {
                       <div>
                         <CardTitle className="text-xl">{team.name}</CardTitle>
                         <div className="flex items-center gap-2 mt-1">
-                          {getRoleBadge(team.role || 'member')}
+                          {getRoleBadge(team.role || "member")}
                         </div>
                       </div>
                     </div>
@@ -283,7 +323,7 @@ export default function TeamsPage() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <p className="text-sm text-muted-foreground line-clamp-2">
-                    {team.description || 'No description'}
+                    {team.description || "No description"}
                   </p>
 
                   <div className="flex items-center justify-between text-sm">
@@ -311,7 +351,9 @@ export default function TeamsPage() {
         <Card>
           <CardHeader>
             <CardTitle>Team Benefits</CardTitle>
-            <CardDescription>What you can do with team workspaces</CardDescription>
+            <CardDescription>
+              What you can do with team workspaces
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="grid gap-4 md:grid-cols-3">
@@ -323,7 +365,8 @@ export default function TeamsPage() {
                   <h4 className="font-semibold">Collaborate</h4>
                 </div>
                 <p className="text-sm text-muted-foreground">
-                  Work together with your team on prompt templates and share best practices
+                  Work together with your team on prompt templates and share
+                  best practices
                 </p>
               </div>
 
@@ -347,7 +390,8 @@ export default function TeamsPage() {
                   <h4 className="font-semibold">Manage Access</h4>
                 </div>
                 <p className="text-sm text-muted-foreground">
-                  Control who can access and edit team resources with role-based permissions
+                  Control who can access and edit team resources with role-based
+                  permissions
                 </p>
               </div>
             </div>

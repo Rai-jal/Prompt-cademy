@@ -1,17 +1,33 @@
-'use client';
+"use client";
 
-import { useCallback, useEffect, useState } from 'react';
-import { useAuth } from '@/lib/auth-context';
-import { useRouter, useParams } from 'next/navigation';
-import { SidebarLayout } from '@/components/sidebar-layout';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { supabase, Lesson, UserProgress } from '@/lib/supabase';
-import { runPromptViaApi } from '@/lib/client/ai';
-import { scorePrompt, ScoreBreakdown } from '@/lib/scoring-service';
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useAuth } from "@/lib/auth-context";
+import { useRouter, useParams } from "next/navigation";
+import { SidebarLayout } from "@/components/sidebar-layout";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { supabase, Lesson, UserProgress } from "@/lib/supabase";
+import { runPromptViaApi } from "@/lib/client/ai";
+import { AI_MODELS } from "@/lib/ai-models";
+import { scorePrompt, ScoreBreakdown } from "@/lib/scoring-service";
+import { useUserApiKeys } from "@/hooks/use-user-api-keys";
 import {
   Lightbulb,
   Sparkles,
@@ -22,9 +38,16 @@ import {
   Target,
   Zap,
   ChevronLeft,
-} from 'lucide-react';
-import Link from 'next/link';
-import { useToast } from '@/hooks/use-toast';
+} from "lucide-react";
+
+const LESSON_MODELS = [
+  "gemini-pro",
+  "gemini-flash",
+  "gpt-4o",
+  "gpt-4o-mini",
+] as const;
+import Link from "next/link";
+import { useToast } from "@/hooks/use-toast";
 
 export default function LessonPage() {
   const { user, loading } = useAuth();
@@ -36,25 +59,63 @@ export default function LessonPage() {
 
   const [lesson, setLesson] = useState<Lesson | null>(null);
   const [progress, setProgress] = useState<UserProgress | null>(null);
-  const [prompt, setPrompt] = useState('');
-  const [response, setResponse] = useState('');
+  const [prompt, setPrompt] = useState("");
+  const [response, setResponse] = useState("");
   const [score, setScore] = useState<ScoreBreakdown | null>(null);
   const [isRunning, setIsRunning] = useState(false);
   const [showHints, setShowHints] = useState(false);
   const [loadingData, setLoadingData] = useState(true);
+  const [selectedModel, setSelectedModel] = useState("gemini-pro");
+  const { keys: apiKeys } = useUserApiKeys();
+  const activeProviders = useMemo(
+    () =>
+      new Set(
+        apiKeys.filter((key) => key.is_active).map((key) => key.provider)
+      ),
+    [apiKeys]
+  );
+  const isModelEnabled = useCallback(
+    (modelKey: string) => {
+      const provider = AI_MODELS[modelKey]?.provider;
+      if (!provider) return false;
+      return activeProviders.has(provider);
+    },
+    [activeProviders]
+  );
+  const hasGoogleKey = activeProviders.has("google");
+  const hasAvailableModel = useMemo(
+    () => LESSON_MODELS.some((modelKey) => isModelEnabled(modelKey)),
+    [isModelEnabled]
+  );
+
+  useEffect(() => {
+    const currentProvider = AI_MODELS[selectedModel]?.provider;
+    if (currentProvider && activeProviders.has(currentProvider)) {
+      return;
+    }
+
+    const fallbackModel = LESSON_MODELS.find((modelKey) => {
+      const provider = AI_MODELS[modelKey]?.provider;
+      return provider && activeProviders.has(provider);
+    });
+
+    if (fallbackModel) {
+      setSelectedModel(fallbackModel);
+    }
+  }, [activeProviders, selectedModel]);
 
   useEffect(() => {
     if (!loading && !user) {
-      router.push('/login');
+      router.push("/login");
     }
   }, [user, loading, router]);
 
   const loadLessonData = useCallback(async () => {
     try {
       const { data: lessonData } = await supabase
-        .from('lessons')
-        .select('*')
-        .eq('id', lessonId)
+        .from("lessons")
+        .select("*")
+        .eq("id", lessonId)
         .maybeSingle();
 
       if (!lessonData) {
@@ -65,28 +126,28 @@ export default function LessonPage() {
       setLesson(lessonData);
 
       const { data: progressData } = await supabase
-        .from('user_progress')
-        .select('*')
-        .eq('user_id', user!.id)
-        .eq('lesson_id', lessonId)
+        .from("user_progress")
+        .select("*")
+        .eq("user_id", user!.id)
+        .eq("lesson_id", lessonId)
         .maybeSingle();
 
       setProgress(progressData);
 
       if (!progressData) {
-        await supabase.from('user_progress').insert({
+        await supabase.from("user_progress").insert({
           user_id: user!.id,
           lesson_id: lessonId,
-          status: 'in_progress',
+          status: "in_progress",
         });
-      } else if (progressData.status === 'not_started') {
+      } else if (progressData.status === "not_started") {
         await supabase
-          .from('user_progress')
-          .update({ status: 'in_progress' })
-          .eq('id', progressData.id);
+          .from("user_progress")
+          .update({ status: "in_progress" })
+          .eq("id", progressData.id);
       }
     } catch (error) {
-      console.error('Error loading lesson:', error);
+      console.error("Error loading lesson:", error);
     } finally {
       setLoadingData(false);
     }
@@ -101,19 +162,19 @@ export default function LessonPage() {
   const handleRunPrompt = async () => {
     if (!prompt.trim() || !lesson) {
       toast({
-        title: 'Empty prompt',
-        description: 'Please enter a prompt to test.',
-        variant: 'destructive',
+        title: "Empty prompt",
+        description: "Please enter a prompt to test.",
+        variant: "destructive",
       });
       return;
     }
 
     setIsRunning(true);
-    setResponse('');
+    setResponse("");
     setScore(null);
 
     try {
-      const result = await runPromptViaApi(prompt, 'gpt-4o');
+      const result = await runPromptViaApi(prompt, selectedModel);
 
       if (result.error) {
         throw new Error(result.error);
@@ -123,11 +184,11 @@ export default function LessonPage() {
       const promptScore = scorePrompt(prompt, lesson, result.tokens_used);
       setScore(promptScore);
 
-      await supabase.from('prompt_attempts').insert({
+      await supabase.from("prompt_attempts").insert({
         user_id: user!.id,
         lesson_id: lessonId,
         prompt_text: prompt,
-        model: 'gpt-4o',
+        model: selectedModel,
         model_params: {},
         model_response: result.response,
         score: promptScore.total,
@@ -143,27 +204,31 @@ export default function LessonPage() {
         const isCompleted = promptScore.total >= 75;
 
         await supabase
-          .from('user_progress')
+          .from("user_progress")
           .update({
             best_score: newBestScore,
             attempts_count: newAttemptsCount,
-            status: isCompleted ? 'completed' : 'in_progress',
-            completed_at: isCompleted && !progress.completed_at ? new Date().toISOString() : progress.completed_at,
+            status: isCompleted ? "completed" : "in_progress",
+            completed_at:
+              isCompleted && !progress.completed_at
+                ? new Date().toISOString()
+                : progress.completed_at,
           })
-          .eq('id', progress.id);
+          .eq("id", progress.id);
 
         if (isCompleted && !progress.completed_at) {
           toast({
-            title: 'Lesson Complete!',
-            description: 'Congratulations! You can now move to the next lesson.',
+            title: "Lesson Complete!",
+            description:
+              "Congratulations! You can now move to the next lesson.",
           });
         }
       }
     } catch (error: any) {
       toast({
-        title: 'Error',
-        description: error.message || 'Failed to run prompt. Please try again.',
-        variant: 'destructive',
+        title: "Error",
+        description: error.message || "Failed to run prompt. Please try again.",
+        variant: "destructive",
       });
     } finally {
       setIsRunning(false);
@@ -183,6 +248,7 @@ export default function LessonPage() {
   }
 
   const content = lesson.content;
+  const selectedModelInfo = AI_MODELS[selectedModel];
 
   return (
     <SidebarLayout>
@@ -214,15 +280,24 @@ export default function LessonPage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
-                  <p className="text-base leading-relaxed">{content.introduction}</p>
+                  <p className="text-base leading-relaxed">
+                    {content.introduction}
+                  </p>
                 </div>
 
                 {content.sections && content.sections.length > 0 && (
                   <div className="space-y-3">
                     {content.sections.map((section: any, index: number) => (
-                      <div key={index} className="border-l-2 border-primary/30 pl-4">
-                        <h4 className="font-semibold mb-1">{section.heading}</h4>
-                        <p className="text-sm text-muted-foreground">{section.content}</p>
+                      <div
+                        key={index}
+                        className="border-l-2 border-primary/30 pl-4"
+                      >
+                        <h4 className="font-semibold mb-1">
+                          {section.heading}
+                        </h4>
+                        <p className="text-sm text-muted-foreground">
+                          {section.content}
+                        </p>
                       </div>
                     ))}
                   </div>
@@ -275,7 +350,7 @@ export default function LessonPage() {
                       <span className="text-lg font-semibold">Hints</span>
                     </div>
                     <span className="text-sm text-muted-foreground">
-                      {showHints ? 'Hide' : 'Show'}
+                      {showHints ? "Hide" : "Show"}
                     </span>
                   </Button>
                 </CardHeader>
@@ -283,7 +358,9 @@ export default function LessonPage() {
                   <CardContent className="space-y-2">
                     {lesson.hints.map((hint, index) => (
                       <div key={index} className="flex gap-2">
-                        <span className="text-primary font-bold">{index + 1}.</span>
+                        <span className="text-primary font-bold">
+                          {index + 1}.
+                        </span>
                         <p className="text-sm text-muted-foreground">{hint}</p>
                       </div>
                     ))}
@@ -312,9 +389,67 @@ export default function LessonPage() {
                   />
                 </div>
 
+                <div className="space-y-2">
+                  <Label htmlFor="lesson-model">Model</Label>
+                  <Select
+                    value={selectedModel}
+                    onValueChange={setSelectedModel}
+                    disabled={!hasAvailableModel}
+                  >
+                    <SelectTrigger id="lesson-model">
+                      <SelectValue placeholder="Select a model" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {LESSON_MODELS.map((modelKey) => {
+                        const model = AI_MODELS[modelKey];
+                        if (!model) return null;
+                        const disabled = !isModelEnabled(modelKey);
+                        return (
+                          <SelectItem
+                            key={modelKey}
+                            value={modelKey}
+                            disabled={disabled}
+                          >
+                            {model.name} ({model.provider})
+                            {!disabled ? null : " – add API key"}
+                          </SelectItem>
+                        );
+                      })}
+                    </SelectContent>
+                  </Select>
+                  {selectedModelInfo && (
+                    <p className="text-xs text-muted-foreground">
+                      Runs on {selectedModelInfo.name} (
+                      {selectedModelInfo.provider}). Make sure you have an
+                      active
+                      {selectedModelInfo.provider === "google"
+                        ? " Google/Gemini"
+                        : selectedModelInfo.provider === "anthropic"
+                        ? " Anthropic"
+                        : " OpenAI"}{" "}
+                      key in Settings.
+                    </p>
+                  )}
+                  {!hasAvailableModel && (
+                    <Alert variant="destructive">
+                      <AlertDescription>
+                        Add an API key in Settings → API Keys to enable lesson
+                        playground runs. Gemini models require an active Google
+                        key.
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                  {!hasGoogleKey && (
+                    <p className="text-xs text-muted-foreground">
+                      Add a Google/Gemini key in Settings → API Keys to unlock
+                      Gemini models.
+                    </p>
+                  )}
+                </div>
+
                 <Button
                   onClick={handleRunPrompt}
-                  disabled={isRunning || !prompt.trim()}
+                  disabled={isRunning || !prompt.trim() || !hasAvailableModel}
                   className="w-full gap-2"
                 >
                   {isRunning ? (
@@ -343,7 +478,9 @@ export default function LessonPage() {
                     </CardHeader>
                     <CardContent>
                       <div className="prose prose-sm max-w-none">
-                        <p className="whitespace-pre-wrap text-sm">{response}</p>
+                        <p className="whitespace-pre-wrap text-sm">
+                          {response}
+                        </p>
                       </div>
                     </CardContent>
                   </Card>
@@ -357,7 +494,9 @@ export default function LessonPage() {
                           <CardTitle className="text-lg">Your Score</CardTitle>
                           <div className="text-3xl font-bold text-primary">
                             {score.total}
-                            <span className="text-lg text-muted-foreground">/100</span>
+                            <span className="text-lg text-muted-foreground">
+                              /100
+                            </span>
                           </div>
                         </div>
                       </CardHeader>
@@ -365,23 +504,33 @@ export default function LessonPage() {
                         <div className="space-y-2">
                           <div className="flex justify-between text-sm">
                             <span>Clarity</span>
-                            <span className="font-medium">{score.clarity}/20</span>
+                            <span className="font-medium">
+                              {score.clarity}/20
+                            </span>
                           </div>
                           <div className="flex justify-between text-sm">
                             <span>Constraints</span>
-                            <span className="font-medium">{score.constraints}/15</span>
+                            <span className="font-medium">
+                              {score.constraints}/15
+                            </span>
                           </div>
                           <div className="flex justify-between text-sm">
                             <span>Specificity</span>
-                            <span className="font-medium">{score.specificity}/20</span>
+                            <span className="font-medium">
+                              {score.specificity}/20
+                            </span>
                           </div>
                           <div className="flex justify-between text-sm">
                             <span>Token Efficiency</span>
-                            <span className="font-medium">{score.token_efficiency}/15</span>
+                            <span className="font-medium">
+                              {score.token_efficiency}/15
+                            </span>
                           </div>
                           <div className="flex justify-between text-sm">
                             <span>Criteria Match</span>
-                            <span className="font-medium">{score.criteria_match}/30</span>
+                            <span className="font-medium">
+                              {score.criteria_match}/30
+                            </span>
                           </div>
                         </div>
 
